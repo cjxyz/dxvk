@@ -56,7 +56,7 @@ while [ $# -gt 0 ]; do
 done
 
 function build_arch {
-  export WINEARCH="win$1"
+  export WINEARCH="win$2"
   export WINEPREFIX="$DXVK_BUILD_DIR/wine.$1"
   
   cd "$DXVK_SRC_DIR"
@@ -93,10 +93,11 @@ function package {
 }
 
 if [ $opt_32_only -eq 0 ]; then
-  build_arch 64
+  build_arch 64 64
+  build_arch arm64ec 64
 fi
 if [ $opt_64_only -eq 0 ]; then
-  build_arch 32
+  build_arch 32 32
 fi
 
 if [ $opt_nopackage -eq 0 ]; then
