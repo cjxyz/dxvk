@@ -1,0 +1,92 @@
+name: hangover
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '**'
+    paths-ignore:
+      - 'README.md'
+
+jobs:
+  foundations:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu2204]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: free disk space
+      run: |
+        sudo swapoff -a
+        sudo rm -f /swapfile
+        sudo apt clean
+        df -h
+
+    - name: Cache docker image
+      id: cache-foundation
+      uses: actions/cache@v4
+      env:
+        cache-name: cache-foundation
+      with:
+        path: foundation${{ matrix.os }}.tgz
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles(format('.packaging/{0}/Dockerfile', matrix.os)) }}
+        lookup-only: true
+
+    - name: Setup packaging
+      if: ${{ steps.cache-foundation.outputs.cache-hit != 'true' }}
+      run: |
+        cp .packaging/${{ matrix.os }}/Dockerfile .
+
+    - name: Build package
+      if: ${{ steps.cache-foundation.outputs.cache-hit != 'true' }}
+      run: docker build -t foundation${{ matrix.os }} .
+
+    - name: Export docker image
+      if: ${{ steps.cache-foundation.outputs.cache-hit != 'true' }}
+      run: docker image save foundation${{ matrix.os }} | gzip -c > foundation${{ matrix.os }}.tgz
+
+
+  dxvk:
+    needs: foundations
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-tags: true
+        submodules: true
+        fetch-depth: 16
+        path: dxvk
+
+    - name: Cache docker image
+      id: cache-foundation
+      uses: actions/cache@v4
+      env:
+        cache-name: cache-foundation
+      with:
+        path: foundationubuntu2204.tgz
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('.packaging/ubuntu2204/Dockerfile') }}
+
+    - name: Import docker image
+      run: docker image load -i foundationubuntu2204.tgz
+
+    - name: get version
+      run: echo DXVKVERSION=$(git -C dxvk describe --abbrev=0) >> "$GITHUB_ENV"; echo DXVKVERSION=$(git -C dxvk describe --abbrev=0)
+
+    - name: Setup packaging
+      run: |
+        cp -r dxvk/.packaging/ubuntu2204/dxvk/* dxvk
+
+    - name: Build package
+      run: cd dxvk; docker build -t dxvk .
+
+    - name: Extract package
+      run: docker run --rm dxvk cat /opt/dxvk/output/dxvk-${{ env.DXVKVERSION }}.tar.gz > dxvk-${{ env.DXVKVERSION }}.tar.gz
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dxvk-${{ env.DXVKVERSION }}.tar.gz
+        path: dxvk-${{ env.DXVKVERSION }}.tar.gz
