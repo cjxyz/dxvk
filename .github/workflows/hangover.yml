@@ -57,7 +57,7 @@ jobs:
       with:
         fetch-tags: true
         submodules: true
-        fetch-depth: 16
+        fetch-depth: 0
         path: dxvk
 
     - name: Cache docker image
@@ -72,8 +72,11 @@ jobs:
     - name: Import docker image
       run: docker image load -i foundationubuntu2204.tgz
 
+    - name: Debug Git Tags
+      run: git -C dxvk tag --list
+
     - name: get version
-      run: echo DXVKVERSION=$(git -C dxvk describe --abbrev=0) >> "$GITHUB_ENV"; echo DXVKVERSION=$(git -C dxvk describe --abbrev=0)
+      run: echo DXVKVERSION=$(git -C dxvk describe --tags --abbrev=0) >> "$GITHUB_ENV"; echo DXVKVERSION=$(git -C dxvk describe --tags --abbrev=0)
 
     - name: Setup packaging
       run: |
