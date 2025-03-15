@@ -5917,7 +5917,8 @@ namespace dxvk {
       : DxvkContextFlag::GpDirtyRasterizerState);
 
     // Retrieve and bind actual Vulkan pipeline handle
-    auto pipelineInfo = m_state.gp.pipeline->getPipelineHandle(m_state.gp.state);
+    auto pipelineInfo = m_state.gp.pipeline->getPipelineHandle(
+      m_state.gp.state, this->checkAsyncCompilationCompat());
 
     if (unlikely(!pipelineInfo.first))
       return false;
@@ -6321,7 +6322,7 @@ namespace dxvk {
   }
 
 
-  void DxvkContext::updateFramebuffer() {
+  void DxvkContext::updateFramebuffer(bool isDraw) {
     if (m_flags.test(DxvkContextFlag::GpDirtyFramebuffer)) {
       m_flags.clr(DxvkContextFlag::GpDirtyFramebuffer);
 
@@ -6343,6 +6344,11 @@ namespace dxvk {
           : VkComponentMapping();
 
         m_state.gp.state.omSwizzle[i] = DxvkOmAttachmentSwizzle(mapping);
+      }
+
+      if (isDraw) {
+        for (uint32_t i = 0; i < fbInfo.numAttachments(); i++)
+          fbInfo.getAttachment(i).view->setRtBindingFrameId(m_device->getCurrentFrameId());
       }
 
       m_flags.set(DxvkContextFlag::GpDirtyPipelineState);
@@ -6865,6 +6871,14 @@ namespace dxvk {
       &m_state.pc.data[pushConstRange.offset]);
   }
   
+  bool DxvkContext::checkAsyncCompilationCompat() {
+    bool fbCompat = true;
+    for (uint32_t i = 0; fbCompat && i < m_state.om.framebufferInfo.numAttachments(); i++) {
+      const auto& attachment = m_state.om.framebufferInfo.getAttachment(i);
+      fbCompat &= attachment.view->getRtBindingAsyncCompilationCompat();
+    }
+    return fbCompat;
+  }
 
   template<bool Resolve>
   bool DxvkContext::commitComputeState() {
@@ -6914,7 +6928,7 @@ namespace dxvk {
     // End render pass if there are pending resolves
     if (m_flags.any(DxvkContextFlag::GpDirtyFramebuffer,
                     DxvkContextFlag::GpRenderPassNeedsFlush))
-      this->updateFramebuffer();
+      this->updateFramebuffer(true);
 
     if (m_flags.test(DxvkContextFlag::GpXfbActive)) {
       // If transform feedback is active and there is a chance that we might
