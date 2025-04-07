@@ -2688,7 +2688,8 @@ namespace dxvk {
     if (access == DxvkAccess::None) {
       // If the attachment is not accessed at all, we can set both the
       // load and store op to NONE if supported by the implementation.
-      bool hasLoadOpNone = m_device->features().khrLoadStoreOpNone;
+      // bool hasLoadOpNone = m_device->features().khrLoadStoreOpNone;
+      bool hasLoadOpNone = 1;
 
       attachment.loadOp = hasLoadOpNone
         ? VK_ATTACHMENT_LOAD_OP_NONE
